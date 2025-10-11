@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true,
         lowercase: true,
-        trim: true,
+        trim: true
     },
     fullName: {
         type: String,
@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema({
     },
     avatar: {
         type: String,
-        required: true,
+        required: true
     },
     coverImage: {
         type: String
