@@ -4,6 +4,26 @@ import { User } from "../models/user.model.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+//This whole async function we are creating here is to be used in login functionality for making steps easy and clean to get access and refresh tokens.
+const generateAccessAndRefreshTokens = async (userId) => {
+    try {
+        const user = await User.findById(userId)
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()
+
+        //This user.refreshToken is actually coming from our model schema that we made. Because we are using the whole user object here.
+        user.refreshToken = refreshToken
+        //This validateBeforeSave false is ensuring that it doesn't interfere with password everytime token is refreshed.
+        await user.save({ validateBeforeSave: false })
+
+        return { accessToken, refreshToken }
+
+
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating refresh and access tokens")
+    }
+}
+
 // We are using async here because there are som actions here that will surely take time.
 const resgisterUser = asyncHandler(async (req, res) => {
     //***Following are the logic building steps. Noted these down for my own ease. */
@@ -37,7 +57,7 @@ const resgisterUser = asyncHandler(async (req, res) => {
     // const coverImageLocalPath = req.files?.coverImage[0]?.path;
     //This above way would've worked too. But since we are doing conditional chaining and we are not having any check on coverImage like we are doing on avatar. We need to use classic JavaScript.
     let coverImageLocalPath;
-    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
         coverImageLocalPath = req.files.coverImage[0].path
     }
 
@@ -75,4 +95,85 @@ const resgisterUser = asyncHandler(async (req, res) => {
     )
 })
 
-export { resgisterUser }
+const loginUser = asyncHandler(async (req, res) => {
+    // req.body -> data
+    //check username and email
+    //check if registered user exists in database
+    // password check
+    // Access and refresh tokens.
+    // send cookies
+
+    const { email, username, password } = req.body
+    if (!username || !email) {
+        throw new ApiError(400, "username or email is required")
+    }
+    //This $or is what we are actually doing to build our logic for both cases username and email. Simple logic for either one would have also be written but this is for learning purpose.
+    //And this $or is a method from MongoDB. There are many others too. We can check those throuh suggestions.
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+    if (!user) {
+        throw new ApiError(404, "User does not exists.")
+    }
+    //This logic is to check password. Important thing here is that we used user not User. Because User is coming from mongoDB and isPasswordCorrect isn't a method of MongoDB. We are checking through bcrypt on our own made user.
+    const isPasswordValid = await user.isPasswordCorrect(password)
+    if (!isPasswordValid) {
+        throw new ApiError(404, "Password isn't correct.")
+    }
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id)
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+
+    //Designing Cookies
+    const options = {
+        //This httpOnly means this field is only customizable from server side, not from frontend or anywhere.
+        httpOnly: true,
+        secure: true
+    }
+    //These cookies below is coming from cookie-parser that we installed earlier.
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    //This user field below is actually data that we declared in our ApiResponse class like this.data = data
+                    user: loggedInUser, accessToken, refreshToken
+                },
+                "User logged in successfully."
+            )
+        )
+})
+
+const logoutUser = asyncHandler(async (req, res) => {
+    //First step= Remove all cookies.
+    //Second Step= Clear refresh tokens.
+    User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true
+        }
+    )
+    const options = {
+        //This httpOnly means this field is only customizable from server side, not from frontend or anywhere.
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out"))
+
+}
+)
+
+export { resgisterUser, loginUser, logoutUser }
