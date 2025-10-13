@@ -18,22 +18,28 @@ const resgisterUser = asyncHandler(async (req, res) => {
     // return response
 
     const { fullName, email, username, password } = req.body
-    console.log("email: ", email);
+    // console.log("email: ", email);
     if (
         [fullName, email, username, password].some((field) => field?.trim() === "")
     ) {
         throw new ApiError(400, "All fields are required")
     }
     //This User written down there is coming from User model.js. By using findOne and $or we are checking in database if username or email already exists
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [{ username }, { email }]
     })
     if (existedUser) {
         throw new ApiError(409, "User with email or username already exists.")
     }
+    // console.log(req.files)
     //This step is the checkpoint using multer checking for image files. We provide multer the path public and original name. Now we are checking through it.
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    //This above way would've worked too. But since we are doing conditional chaining and we are not having any check on coverImage like we are doing on avatar. We need to use classic JavaScript.
+    let coverImageLocalPath;
+    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
+        coverImageLocalPath = req.files.coverImage[0].path
+    }
 
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar file is required.")
