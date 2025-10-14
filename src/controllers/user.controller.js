@@ -179,8 +179,9 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 //Important***V16:15 Making this refresh token to implement after logout. Here we are using that same verifyJWT middleware that was custom made and we used earlier in logout
 const refreshAccessToken = asyncHandler(async (req, res) => {
+    //We used both req down in this line because user can be on phone too.
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
-    if (incomingRefreshToken) {
+    if (!incomingRefreshToken) {
         throw new ApiError(401, "Unauthorized request")
     }
     try {
