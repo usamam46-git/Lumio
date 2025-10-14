@@ -216,4 +216,96 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 })
 
-export { resgisterUser, loginUser, logoutUser,refreshAccessToken }
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body
+    //We are not verifying access refresh tokens here because we will be doing that in routes by simply using our verifyJWT middleware that we made earlier.
+    const user = await User.findById(req.user?._id)
+    //This isPasswordCorrect that we are using with await is actually applying method on mongoose user.**** Check out user model for clearance.
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    if (!isPasswordCorrect) {
+        throw new ApiError(401, "Password is not correct.")
+    }
+    //Setting up the new password down here.
+    user.password = newPassword
+    await user.save({ validateBeforeSave: false })
+    //Now this password is getting hashed on its own because it is modified. The process of getting hashed is coming from user.model line 51-55
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "Password changed successfully"))
+}
+)
+//Lets say if we want to add a confirm password field above we will just compare newPassword with the confirmPassword like this this if(!(newPassword === confirmPassword)){and throw new error here....}
+
+//This below method became quite simple because we had already done that user part and got that.
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res
+        .status(200)
+        .json(200, req.user, "Current user fetched successfully.")
+})
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const { fullName, email } = req.body
+    if (!fullName || !email) {
+        throw new ApiError(400, "All fields are required.")
+    }
+    const user = await User.findByIdAndUpdate(req.user?._id, {
+        $set: {
+            fullName: fullName,
+            email: email
+        }
+    }, { new: true }).select("-password")
+    //By using select up there we actually saved an unneccessary API call by simply using select here instead of finding user again by id and repeating the process.
+    if (!user) {
+        throw new ApiError(400, "Couldn't update account details.")
+    }
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Account details updated successfully."))
+})
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+    //This req.file below is coming from multer middleware. One important thing here is that we are using file here not files. Because earlier we used files in order to save an array.
+    const avatarLocalPath = req.file?.path
+
+    if (!avatarLocalPath) {
+        throw new ApiError(400, "Avatar file is missing.")
+    }
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+    if (!avatar.url) {
+        throw new ApiError(400, "Error while uploading on avatar.")
+    }
+    const user = await User.findByIdAndUpdate(req.user?._id, {
+        $set: {
+            avatar: avatar.url
+        }
+    }, { new: true }).select("-password")
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Avatar image updated successfully."))
+
+})
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+    //This req.file below is coming from multer middleware. One important thing here is that we are using file here not files. Because earlier we used files in order to save an array.
+    const coverImageLocalPath = req.file?.path
+
+    if (!coverImageLocalPath) {
+        throw new ApiError(400, "Cover Image file is missing.")
+    }
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+    if (!coverImage.url) {
+        throw new ApiError(400, "Error while uploading on avatar.")
+    }
+    const user = await User.findByIdAndUpdate(req.user?._id, {
+        $set: {
+            coverImage: coverImage.url
+        }
+    }, { new: true }).select("-password")
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Avatar image updated successfully."))
+
+})
+
+
+export { resgisterUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage }
