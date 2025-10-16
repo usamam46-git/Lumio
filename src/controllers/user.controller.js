@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 
 //This whole async function we are creating here is to be used in login functionality for making steps easy and clean to get access and refresh tokens.
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -154,8 +155,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     User.findByIdAndUpdate(
         req.user._id,
         {
-            $set: {
-                refreshToken: undefined
+            $unset: {
+                refreshToken: 1 //This removes the field from document.
             }
         },
         {
