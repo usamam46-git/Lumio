@@ -307,5 +307,136 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 })
 
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    const { username } = req.params
+    if (!username?.trim()) {
+        throw new ApiError(400, "username is missing")
+    }
+    const channel = await User.aggregate([
+        {
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        {
+            $lookup: {
+                //This subscriptions down here is actually Subscription coming from subscription model. We wrote it as subscriptions because we studied earlier that mongoDB converts it into plural and lowercase.
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+                //Here we are done with our first pipeline, where we found subscribers.
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+                //Here is the second pipeline where we are finding what a user has subscribed to.
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                channelsSubscibedToCount: {
+                    $size: "$subscribedTo"
+                    //Here we are basically adding these fields inside user model though aggregation pipeline.
+                },
+                isSubscribed: {
+                    //This is the if, then, else through mongoDB based on condition.
+                    //This $in can be used both for arrays and objects too.
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subsciber"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        }, {
+            $project: {
+                fullName: 1,
+                username: 1,
+                subscribersCount: 1,
+                channelsSubscibedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1
+            }
+        }
+    ])
+    //First we should console the channel to find what kind of data we are getting.
+    if(!channel?.length){
+        throw new ApiError(404, "channel does not exists.")
+    }
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "User channel fetched successfully.")
+    )
+})
 
-export { resgisterUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage }
+const getWatchHistory = asyncHandler(async (req,res) => {
+  const user = await User.aggregate([
+    {
+        $match: {
+            _id: new mongoose.Types.ObjectId(req.user._id)
+        }
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField:"_id",
+                    as:"owner",
+                    //This down here is a sub pipeline because it will just be here to populate the owner field only.
+                    pipeline: [
+                        {
+                            $project: {
+                                fullName: 1,
+                                username: 1,
+                                avatar: 1
+                            }
+                        }
+                    ]
+                }
+            },
+            //This further data structure is only for ease of frontend because above process will just give an array and there will be need to loop through it. Now in further addFields we will make it easy for the frontend.
+            {
+                $addFields:{
+                    //Here we are only showing that field which is needed and that is owner.
+                    owner:{
+                        $first: "$owner"
+                    }
+                }
+            }
+        ]
+      }
+    }
+  ])
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully."
+    )
+  )
+}
+)
+
+
+export { resgisterUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage, getUserChannelProfile, getWatchHistory }
