@@ -17,7 +17,7 @@ const createTweet = asyncHandler(async (req, res) => {
         user: req.user._id,
     });
 
-    res.status(201).json(new ApiResponse(201, "Tweet created successfully", tweet));
+    res.status(201).json(new ApiResponse(201, tweet, "Tweet created successfully"));
 });
 
 const getUserTweets = asyncHandler(async (req,res) => {
@@ -31,7 +31,7 @@ const getUserTweets = asyncHandler(async (req,res) => {
 
     const tweets = await Tweet.find({ user: userId });
 
-    res.status(200).json(new ApiResponse(200, "User tweets retrieved successfully", tweets));
+    res.status(200).json(new ApiResponse(200, tweets, "User tweets retrieved successfully"));
 });
 
 const updateTweet = asyncHandler(async (req,res) => {
@@ -48,7 +48,7 @@ const updateTweet = asyncHandler(async (req,res) => {
         throw new ApiError(404, "Tweet not found");
     }
 
-    res.status(200).json(new ApiResponse(200, "Tweet updated successfully", tweet));
+    res.status(200).json(new ApiResponse(200, tweet, "Tweet updated successfully"));
 });
 
 const deleteTweet = asyncHandler(async (req,res) => {
@@ -58,7 +58,7 @@ const deleteTweet = asyncHandler(async (req,res) => {
     if (!tweet) {
         throw new ApiError(404, "Tweet not found");
     }
-    res.status(200).json(new ApiResponse(200, "Tweet deleted successfully", null));
+    res.status(200).json(new ApiResponse(200, null, "Tweet deleted successfully"));
 });
 
 const getAllTweets = asyncHandler(async (req, res) => {
@@ -66,7 +66,7 @@ const getAllTweets = asyncHandler(async (req, res) => {
     if(!tweets || tweets.length === 0){
         throw new ApiError(404, "No tweets found");
     }
-    res.status(200).json(new ApiResponse(200, "All tweets retrieved successfully", tweets));
+    res.status(200).json(new ApiResponse(200, tweets, "All tweets retrieved successfully"));
 });
 
 
